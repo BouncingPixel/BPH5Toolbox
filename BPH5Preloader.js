@@ -54,7 +54,7 @@ BPH5Preloader.create = function( options ) {
 	};
 
 	preload.onProgress = function( event ) {
-		console.log( 'handleProgress percent: ' + event.loaded*100 );
+		// console.log( 'handleProgress percent: ' + event.loaded*100 );
 	}
 
 	preload.onFileLoad = function( event ) {
@@ -67,7 +67,7 @@ BPH5Preloader.create = function( options ) {
 				console.log( 'handleFileLoadComplete w: ' + this.width + ' h: ' + this.height );
 			};
 
-			console.log( "Image: " + event.id );
+			console.log( "Image: " + event.id + imagesObject );
 
 			imagesObject[ event.id ] = event.result;
 		}
