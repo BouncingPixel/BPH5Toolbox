@@ -1,7 +1,7 @@
 /*
  * BPH5Toolbox.js
  *
- * (c) 2012 Bouncing Pixel
+ * (c) 2014 Bouncing Pixel
  *
  */
 
