@@ -1,6 +1,6 @@
 /*
  * BPH5Toolbox.js
- *
+ * For use with CreateJS exports from Flash
  * (c) 2014 Bouncing Pixel
  *
  */
@@ -12,51 +12,50 @@
 //
 var BPH5Toolbox = {};
 
-/*
+/* AddMovieClipActions(instance:createjs.DisplayObject, actions:Array)
+	Sets up actions to happen at points along a CreateJS DisplayObjects's timeline
+	
+	You cannot add more actions to the same DisplayObject later, the timeline callback is overwritten each time you call AddMovieClipActions. Make sure to gather all actions into one array before calling it.
+	
 	 Each action's Parameters = {
-		label:String,
-		beforeLabel:Boolean,
-		stop:Boolean,
-		action:Function,
-		atEnd:Boolean
+		label:String,			The timeline label to look for
+		beforeLabel:Boolean, 	If you want to put the action before the label, use this
+		stop:Boolean,			set a stop at that frame
+		action:Function,		set a function to occur at that frame
+		atEnd:Boolean			
 	 }
 */
 BPH5Toolbox.AddMovieClipActions = function( instance, actions ) {
 
+	//Every time the frame changes, check whether an action must be performed
 	instance.timeline.onChange = function() {
 		var i;
 		var position = instance.timeline.position;
 		var actionPosition;
-		//console.log("TIMELINE CHANGED");
 
 		for( i = 0 ; i < actions.length ; i++ ) {
 			actionPosition = instance.timeline.resolve( actions[i].label );
 
-			//console.log(i,"action is",actions[i],instance,instance.timeline.resolve(actions[i].label))
 			if( actions[i].beforeLabel ) {
 				actionPosition = actionPosition - 1;
-				//console.log(actions[i],"BEFORE",actionPosition);
 			}
-			if( actions[i].label === '__END__' ) {
-				actionPosition = instance.timeline.duration-1;
-				//console.log(actions[i],"AT END",actionPosition);
+			if( actions[i].label === '__END__' ) { //special label for the end of the timeline
+				actionPosition = instance.timeline.duration-1; //set up to check atEnd param
 			}
 			if (actions[i].atEnd){
-				//just check if the nEXT frame is the right one??
 				var k = instance.timeline.duration;
+				//search for the next label after this one
 				for (var l in instance.timeline._labels){
 					var temp = instance.timeline.resolve(l);
 					if(temp > actionPosition && temp < k){
 						k = temp;
 					}
 				}
-				actionPosition = k - 1;
-				//console.log(actions[i],"BPHTOOLBOX = Add script at end which is frame "+actionPosition);
+				actionPosition = k - 1; //WARNING! This seems to stack with __END__ label - 1. Test for possible discrepancy
 			}
 
 			// at the frame label
 			if( position === actionPosition ) {
-				//console.log("IS AT THE FRAME",position);
 				if( actions[i].stop ) { instance.stop(); }
 				if( actions[i].action ) { actions[i].action.call( instance ); }
 				break;
@@ -125,7 +124,7 @@ BPH5Toolbox.InitializeBitmap = function( imageArray, imageID, parameters ) {
 //	};
 //
 BPH5Toolbox.MakeButton = function( displayObject, parameters ) {
-	//if in array, replace with the new one
+	//if button is already registered, replace it with the new one
 	if(_registeredButtons.indexOf(displayObject) > 0){ 
 		BPH5Toolbox.RemoveInteractive(displayObject); 
 	}
@@ -153,7 +152,6 @@ BPH5Toolbox.MakeButton = function( displayObject, parameters ) {
 	(function( oldOnPress ) {
 
 		displayObject.onPress = function( event ) {
-			//console.log("clicked button");
 			displayObject.pressed = true;
 			event.onMouseUp = function(ev){				
 				displayObject.pressed = false;
@@ -300,7 +298,13 @@ BPH5Toolbox.MakeRadioButtons = function( displayObjects, parameters ) {
 /*
 	MakeMultipleChoice( displayObject:createjs.DisplayObject, options:Array, callback:Function, parameters:Object )
 
-	This is based on as3 toolbox DropDownCreator, but assumes object exists on stage.
+	This is based on as3 toolbox DropDownCreator.
+	A flash-exported DisplayObject should contain all the option objects, unless it's a dropdown. 
+	If it's a dropdown, it should contain an option and a slot object. 
+	Each option object contains a text field and a background. Hover states are applied to the background object.
+	
+	Each displayObject in the createJS export needs to be named differently; set optionName, optionTFName, and optionBGName to deal with these differences.
+	
 	Optional parameters object.
 	Returns nothing.
  		options array element
@@ -310,11 +314,12 @@ BPH5Toolbox.MakeRadioButtons = function( displayObjects, parameters ) {
 	parameters = {
 		randomize:Boolean,			//default undefined
 		submitBtn:createjs.DisplayObject	//default undefined
-		optionName:String 			//default "option" 	//these will see a lot of use
-		optionTFName:String 		//default "tf"		//because things must be named
-		optionBGName:String 		//default "bg"		//differently in javascript
+		optionName:String 			//default "option" 	
+		optionTFName:String 		//default "tf"		
+		optionBGName:String 		//default "bg"		
 		validateEach:Boolean		//default undefined //waits until you pick the right one to continue
 		clickCallback:Function 		//default undefined //called whenever a button is clicked, regardless of validation
+		wrongCallback				//default undefined //used for dropdowns only. TODO: test and use in other cases
 	
 		normalState:String 			//default "N"
 		hoverState:String 			//default "H"
@@ -352,6 +357,7 @@ BPH5Toolbox.MakeMultipleChoice = function(displayObject, options, callback, para
 	parameters.callback = callback;
 	parameters.options = options;
 
+	//Change the order of the options but not the display objects themselves
 	if(parameters.randomize){
 		var newOptions = []; 
 		var rand;
@@ -359,12 +365,11 @@ BPH5Toolbox.MakeMultipleChoice = function(displayObject, options, callback, para
 			rand = Math.floor(Math.random()*options.length);
 			newOptions.push(options[rand]);
 			options.splice(rand,1);
-			//console.log("options",options.toString(),"New",newOptions.toString());
 		}
 		options = newOptions;
-		//console.log("Switched to new options",options,newOptions);
 	}
 
+	//set up heights
 	var diffY = 0;
 	if(parameters.isDropdown){
 		if(!parameters.slotName){ parameters.slotName = "slot";}
@@ -423,7 +428,7 @@ BPH5Toolbox.MakeMultipleChoice = function(displayObject, options, callback, para
 			});
 		}
 	}
-	//i should end up at options.length. Hide unused options
+	//i should end up at options.length. Reset unused display objects and hide them
 	while(displayObject[parameters.optionName+(i+1)]){
 		displayObject[parameters.optionName+(i+1)][parameters.optionTFName].text = "";
 		displayObject[parameters.optionName+(i+1)][parameters.optionBGName].gotoAndStop(parameters.normalState);
@@ -433,19 +438,19 @@ BPH5Toolbox.MakeMultipleChoice = function(displayObject, options, callback, para
 
 	if(parameters.isDropdown){
 		hideOptions( parameters ); //this also sets slot button
-		//console.log("dropdown is",parameters.options);
 	}
 
 	_registeredMultipleChoice.push(parameters);
 };
 
+// 
+// Functions for dropdowns
+// 
 
-//Functions for dropdowns only
 var selectOption = function(displayObject){
 	var params = findMultipleChoice(displayObject.parent);
 	console.log( "PARAMS   ", params);
-	//console.log("Select option",displayObject.optionNum, displayObject[params.optionTFName].text);
-	params.currentOption = displayObject.optionNum; //needed?
+	params.currentOption = displayObject.optionNum;
 	params.status = "wrong";
 
 	hideOptions(params);
@@ -516,16 +521,15 @@ var hideOptions = function(params){
 
 //function for normal multiple choice (all buttons exist on screen)
 var clickMultipleChoice = function(displayObject){
-	var params = findMultipleChoice(displayObject.parent); //need to get the button container
+	var params = findMultipleChoice(displayObject.parent); //get the button container
 	if (!params){
 		console.log("ERROR: Could not find multiple choice params");
 		return;
 	}
 
-	if(params.submitBtn){ //assume this means wait to validate.
+	if(params.submitBtn){ //assume this means wait to validate
 		//reactivate all other buttons
 		var i = 0;
-		//make sure this doesn't add it to the list twice. I think it does.
 		while(params.displayObject[params.optionName+(i+1)]){
 			BPH5Toolbox.MakeButton(params.displayObject[params.optionName+(i+1)],{callback:clickMultipleChoice,noAutoHover:true,passMC:true,
 				hoverFunc:choiceBackFunction(params.displayObject[params.optionName+(i+1)],params.optionBGName,params.hoverState),
@@ -554,7 +558,7 @@ var ValidateMC = function(paramObj,buttonClicked){
 	var theButton;
 	if(buttonClicked.correct){
 		paramObj.status = "right";
-		playSound("rightSound");
+		playSound("rightSound"); //this is hardcoded and should ideally be passed as a param
 		buttonClicked[paramObj.optionBGName].gotoAndStop(paramObj.rightFrameLabel);
 		if(paramObj.isDropdown){
 			if(paramObj.displayObject[paramObj.slotName][paramObj.slotBGName].timeline.resolve(paramObj.rightFrameLabel)){
@@ -567,20 +571,19 @@ var ValidateMC = function(paramObj,buttonClicked){
 	}
 	else{		
 		paramObj.status = "wrong";
-		playSound("wrongSound");
+		playSound("wrongSound"); //this is hardcoded and should ideally be passed as a param
 		buttonClicked[paramObj.optionBGName].gotoAndStop(paramObj.wrongFrameLabel);
-		//and remove button?
+		//If it's a dropdown, apply the wrong state to the slot too
 		if(paramObj.isDropdown){
 			paramObj.displayObject[paramObj.slotName][paramObj.slotTFName].text = "";
 			paramObj.displayObject[paramObj.slotName][paramObj.slotBGName].gotoAndStop(paramObj.wrongFrameLabel);
 		}
 	}
-	paramObj.answer = buttonClicked[paramObj.optionTFName].text;
+	paramObj.answer = buttonClicked[paramObj.optionTFName].text; //save answer for external checking
 	
 	if(paramObj.isDropdown){
 		hideOptions(paramObj);
 		BPH5Toolbox.RemoveInteractive(buttonClicked);
-		//paramObj.callback(paramObj.displayObject,buttonClicked.optionNum);
 
 		if(paramObj.status == "right"){
 			BPH5Toolbox.RemoveInteractive(paramObj);
@@ -590,7 +593,7 @@ var ValidateMC = function(paramObj,buttonClicked){
 			paramObj.wrongCallback(paramObj.displayObject,buttonClicked.optionNum);
 		}
 	}
-	else if(paramObj.validateEach){
+	else if(paramObj.validateEach){ //must click on all correct answers to proceed
 		BPH5Toolbox.RemoveInteractive(buttonClicked);
 		//Show the final callback if all the right ones are selected.
 		i = 1;
@@ -611,11 +614,10 @@ var ValidateMC = function(paramObj,buttonClicked){
 			paramObj.callback();
 		}
 	}
-	else{		// || paramObj.status == "right")
-		//also show the correct answer
+	else{ //single choice validation		
 		i = 1;
 		theButton = paramObj.displayObject[paramObj.optionName + i];
-		while(theButton){
+		while(theButton){//also show the correct answers
 			if(theButton.correct){
 				theButton[paramObj.optionBGName].gotoAndStop(paramObj.rightFrameLabel);
 			}
@@ -625,17 +627,10 @@ var ValidateMC = function(paramObj,buttonClicked){
 		}
 		paramObj.callback();
 	}
-	//console.log("Button list",_registeredButtons);
 };
 
-BPH5Toolbox.GetStatus = function(displayObject){
-	return(findMultipleChoice(displayObject).status);
-}
-
-BPH5Toolbox.GetAnswer = function(displayObject){
-	return(findMultipleChoice(displayObject).answer);
-}
-
+//because we aren't changing the background of the displayObject itself
+//We need to change the state of the background object instead
 var choiceBackFunction = function(displayObject,bgName,label){
 	return function(){displayObject[bgName].gotoAndStop(label);}
 };
@@ -649,8 +644,17 @@ var findMultipleChoice = function(displayObject){
 	return null;
 };
 
+//External accessor methods
+BPH5Toolbox.GetStatus = function(displayObject){
+	return(findMultipleChoice(displayObject).status);
+};
+
+BPH5Toolbox.GetAnswer = function(displayObject){
+	return(findMultipleChoice(displayObject).answer);
+};
+
 //
-//
+// Shortcut for creating multiple draggables at once. They all have the same targets.
 //
 BPH5Toolbox.MakeDraggableMulti = function( displayObjectArray, collidesWith, callback, dropAnywhere, parameters ) {
 	var i;
@@ -697,17 +701,15 @@ BPH5Toolbox.MakeDraggable = function( displayObject, collidesWith, callback, dro
 			hitArea.graphics.beginFill("#00F").drawRect(-1*displayObject.nominalBounds.width/2,-1*displayObject.nominalBounds.height/2,displayObject.nominalBounds.width,displayObject.nominalBounds.height);
 		}		
 		displayObject.hitArea = hitArea;
-		//console.log("Creating hit area: ",displayObject.hitArea);
 	}
-	//console.log("Troubleshoot scale:", displayObject.scaleX, parameters.scaleChange);
 	displayObject.preDragScale = displayObject.scaleX;
 
 	displayObject.onPress = function( event ) {
 		displayObject.dragging = true;
 		displayObject.preDragX = displayObject.x;
 		displayObject.preDragY = displayObject.y;
-		displayObject.origParent = displayObject.parent;
-		//if we want to not add it back to parent
+		displayObject.origParent = displayObject.parent; //adding it back to the parent is the easiest way to preserve bounds and position
+		//if we want to not add it back to parent:
 		//var originalPosition = displayObject.localToGlobal( displayObject.nominalBounds.x, displayObject.nominalBounds.y );
 		//displayObject.preDragX = originalPosition.x+displayObject.nominalBounds.width/2;
 		//displayObject.preDragY = originalPosition.y+displayObject.nominalBounds.height/2;
@@ -721,7 +723,6 @@ BPH5Toolbox.MakeDraggable = function( displayObject, collidesWith, callback, dro
 		if(parameters.clickAction){
 			parameters.clickAction();
 		}
-		console.log("obj starts at",displayObject.x,displayObject.y,displayObject.preDragX,displayObject.preDragY);
 		displayObject.x = event.stageX;
 		displayObject.y = event.stageY;
 		event.onMouseMove = function( ev ) {
@@ -739,7 +740,6 @@ BPH5Toolbox.MakeDraggable = function( displayObject, collidesWith, callback, dro
 			var doRect, cwRect;
 			displayObject.dragging = false;
 			console.log("scaled back to",displayObject.scaleX);
-			//console.log( "MouseUp" );
 			if( collidesWith ) {
 				// do rectangle collision here
 				doPt = displayObject.localToGlobal( displayObject.nominalBounds.x, displayObject.nominalBounds.y );
@@ -754,12 +754,9 @@ BPH5Toolbox.MakeDraggable = function( displayObject, collidesWith, callback, dro
 					if( BPH5Toolbox.RectanglesIntersect( doRect, cwRect ) ) {
 						displayObject.x = cwRect.x;
 						displayObject.y = cwRect.y;
-						// displayObject.x = displayObject.x;
-						// displayObject.y = displayObject.y;
 						console.log( "collided! ", "doRect", doRect, "cwRect",cwRect, collidesWith[i].nominalBounds.width,collidesWith[i].nominalBounds.height );
 						collided = true;
 						displayObject.scaleX = displayObject.scaleY = displayObject.preDragScale;
-						//always add back to parent
 						displayObject.origParent.addChild(displayObject);
 						callback( displayObject,collidesWith[i] );
 						if(parameters.upAction){
@@ -780,22 +777,25 @@ BPH5Toolbox.MakeDraggable = function( displayObject, collidesWith, callback, dro
 			if(parameters.upAction){
 				parameters.upAction(displayObject);
 			}
-			displayObject.origParent.addChild(displayObject);
+			displayObject.origParent.addChild(displayObject);//always add back to parent
 		};
 
 		stage.update();
-	};/*
-	displayObject.onMouseOut = function( event ) {
-		//displayObject.scaleX = displayObject.scaleY = displayObject.scaleX / 1.1;
 	};
-	displayObject.onMouseOver = function( event ) {
-		//displayObject.scaleX = displayObject.scaleY = displayObject.scaleX * 1.1;
-	};*/
 };
 
+//Public function to set an object to snap back to its pre-dragged position (saved when first set up)
+BPH5Toolbox.SnapBack = function(displayObject){	
+	console.log( "snapping back to " + displayObject.preDragX + " " + displayObject.preDragY );
+	displayObject.x = displayObject.preDragX;
+	displayObject.y = displayObject.preDragY;
+};
+
+
 /*
-	Allows an object to be pulled/dragged to a certain object, while, animating
+	Allows an object to be pulled/dragged to a certain object, while animating
 	it along its timeline
+	Added by Deary Hudson (AS3 port)
 
 	@parameters
 	animatedObj: MovieClip
@@ -1027,14 +1027,8 @@ BPH5Toolbox.getFrameLabelDuration = function (animatedObj, forLabel){
 		return frameDuration;
 	}
 
-BPH5Toolbox.SnapBack = function(displayObject){	
-	console.log( "snapping back to " + displayObject.preDragX + " " + displayObject.preDragY );
-	displayObject.x = displayObject.preDragX;
-	displayObject.y = displayObject.preDragY;
-};
-
 //
-//
+// Draggable functions
 //
 BPH5Toolbox.RectanglesIntersect = function( rect1, rect2 ) {
    	var tempRect1 = { width:rect1.width, height:rect1.height};	
@@ -1048,6 +1042,7 @@ BPH5Toolbox.RectanglesIntersect = function( rect1, rect2 ) {
 	return true;
 };
 
+//For debugging purposes, show the collision bounds
 BPH5Toolbox.DrawHitRectangles = function(rect1,rect2, rectContainer){
 
 	var g = new createjs.Graphics();
@@ -1106,29 +1101,22 @@ BPH5Toolbox.RemoveInteractive = function(displayObject){
 			}
 			BPH5Toolbox.RemoveInteractive(params.displayObject[params.slotName]);
 		}
-		/*
-		var parameters = findMultipleChoice(displayObject);
-		var i = 1;
-		while(displayObject[parameters.optionName+String(i)]){
-			BPH5Toolbox.RemoveInteractive(displayObject[parameters.optionName+String(i)]);
-			i++;
-		}*/
 		_registeredMultipleChoice.splice(_registeredMultipleChoice.indexOf(displayObject),1);
 	}
 };
+
+//Shortcuts for removing multiple interactive objects at once
 
 BPH5Toolbox.RemoveAllDraggables = function(){	
 	while(_registeredDraggables.length){
 		BPH5Toolbox.RemoveInteractive(_registeredDraggables[0]);
 	}
-	//_registeredDraggables = [];
 };
 
 BPH5Toolbox.RemoveAllButtons = function(){
 	while(_registeredButtons.length){
 		BPH5Toolbox.RemoveInteractive(_registeredButtons[0]);
 	}
-	//_registeredButtons = [];
 };
 
 BPH5Toolbox.RemoveAllMultipleChoice = function(){
@@ -1142,7 +1130,6 @@ BPH5Toolbox.RemoveAllMultipleChoice = function(){
 		}
 		BPH5Toolbox.RemoveInteractive(_registeredMultipleChoice[0]);
 	}
-	//_registeredButtons = [];
 };
 
 BPH5Toolbox.RemoveAllInteractive = function(){
